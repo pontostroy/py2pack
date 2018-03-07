@@ -1,8 +1,10 @@
+%define          debug_package %{nil}
 #
 # spec file for package python-{{ name }}
 #
 # Copyright (c) {{ year }} {{ user_name }}.
 #
+%{!?python_sitelib: %global python_sitelib %(%{__python2} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
 Name:           python-{{ name }}
 Version:        {{ version }}
@@ -14,22 +16,48 @@ Group:          Development/Languages/Python
 Source:         {{ source_url|replace(version, '%{version}') }}
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  python-devel {%- if requires_python %} = {{ requires_python }} {% endif %}
-{%- for req in requires %}
+BuildRequires:  gcc
+BuildRequires:  libtool
+BuildRequires:  python-libs
+{%- if setup_requires and setup_requires is not none %}
+{%- for req in setup_requires|sort %}
 BuildRequires:  python-{{ req|replace('(','')|replace(')','') }}
+{%- endfor %}
+{%- endif %}
+{%- if (install_requires and install_requires is not none) or (tests_require and tests_require is not none) %}
+# SECTION test requirements
+{%- if install_requires and install_requires is not none %}
+{%- for req in install_requires|sort %}
+BuildRequires:  python-{{ req|replace('(','')|replace(')','') }}
+{%- endfor %}
+{%- endif %}
+{%- if tests_require and tests_require is not none %}
+{%- for req in tests_require|sort %}
+BuildRequires:  python-{{ req|replace('(','')|replace(')','') }}
+{%- endfor %}
+{%- endif %}
+# /SECTION
+{%- endif %}
+{%- if source_url.endswith('.zip') %}
+BuildRequires:  unzip
+{%- endif %}
+BuildRequires:  fdupes
+{%- if install_requires and install_requires is not none %}
+{%- for req in install_requires|sort %}
 Requires:       python-{{ req|replace('(','')|replace(')','') }}
 {%- endfor %}
-{%- for req in install_requires %}
-BuildRequires:  python-{{ req|replace('(','')|replace(')','') }}
-Requires:       python-{{ req|replace('(','')|replace(')','') }}
-{%- endfor %}
-{%- if extras_require %}
+{%- endif %}
+{%- if extras_require and extras_require is not none %}
 {%- for reqlist in extras_require.values() %}
 {%- for req in reqlist %}
 Suggests:       python-{{ req|replace('(','')|replace(')','') }}
 {%- endfor %}
 {%- endfor %}
 {%- endif %}
-
+{%- if not has_ext_modules %}
+BuildArch:      noarch
+{%- endif %}
+%{?python_provide:%python_provide python2-%{mod_name}}
 %description
 {{ description }}
 
@@ -53,9 +81,11 @@ rm -rf %{buildroot}
 {%- if doc_files %}
 %doc {{ doc_files|join(" ") }}
 {%- endif %}
+{%- if scripts and scripts is not none %}
 {%- for script in scripts %}
-%{_bindir}/{{ script }}
+%{_bindir}/{{ script|basename }}
 {%- endfor %}
+{%- endif %}
 %{python_sitelib}/*
 
 %changelog
